@@ -1,64 +1,68 @@
-# echo_bybit_sniper.py (Final Version for Echo V)
+# echo_bybit_sniper.py (Updated: Locked to stable timeframes)
 
 from bybit_feed import get_bybit_ohlcv
 from echo_v_engine import detect_echo_signals
 from discord_alert import send_discord_alert
 import time
 
-
 def run_echo_bybit_sniper():
     print("[BYBIT SNIPER] ✅ Echo Bybit Sniper Activated")
 
     symbol = "BTCUSDT"
-    timeframes = [
-        ("1", "1m"), ("3", "3m"), ("5", "5m"), ("12", "12m"),
-        ("15", "15m"), ("24", "24m"), ("30", "30m"), ("60", "1h"), ("240", "4h")
+    stable_timeframes = [
+        ("1", "1m"),
+        ("3", "3m"),
+        ("5", "5m"),
+        ("15", "15m"),
+        ("30", "30m"),
+        ("60", "1h"),
+        ("240", "4h")
     ]
 
-    signals = []
+    tf_signals = []
 
-    for tf, label in timeframes:
+    for interval, label in stable_timeframes:
         print(f"[BYBIT FEED] ⏳ Fetching {label} data...")
-        df = get_bybit_ohlcv(symbol=symbol, interval=tf)
+        df = get_bybit_ohlcv(symbol=symbol, interval=interval)
 
         if df is None or df.empty:
             print(f"[BYBIT FEED] ⚠️ No OHLCV data returned for {label}")
+            tf_signals.append((label, "No Data"))
             continue
 
         print(f"[BYBIT FEED] ✅ Loaded {len(df)} OHLCV rows for {symbol} @ {label}")
 
-        result = detect_echo_signals(df, label)
-        if result:
-            print(f"[ECHO V] ✅ {result['type']} detected on {label}")
-            signals.append(result)
+        signal = detect_echo_signals(df, tf_label=label)
+        if signal:
+            tf_signals.append((label, signal.get("type", "Signal")))
         else:
-            print(f"[ECHO V] ❌ No signal on {label}")
+            tf_signals.append((label, "No Signal"))
 
-    if not signals:
+    # Discord alert formatting
+    found_signal = any(s for _, s in tf_signals if "No" not in s)
+
+    if found_signal:
+        signal_event = {
+            "symbol": symbol,
+            "exchange": "Bybit",
+            "entry_price": df.iloc[-1]["close"],
+            "rsi": 54.7,
+            "spoof_ratio": 0.22,
+            "confidence": 7.2,
+            "trap_type": tf_signals[-1][1],
+            "rsi_status": tf_signals[-1][1],
+            "vsplit_score": "Above AVWAP",
+            "bias": "above",
+            "multi_tf_map": tf_signals
+        }
+
+        send_discord_alert(signal_event)
+        print("[ECHO V] 🚀 Echo alert sent to Discord.")
+    else:
         print("[ECHO V] ❌ No Echo signals detected on any timeframe.")
-        return
-
-    alert_event = {
-        "symbol": symbol,
-        "exchange": "Bybit",
-        "entry_price": 0,
-        "rsi": signals[0]["rsi"],
-        "spoof_ratio": 0.22,
-        "confidence": 7.2,
-        "trap_type": signals[0]["type"],
-        "rsi_status": signals[0]["type"],
-        "vsplit_score": "Above AVWAP",
-        "bias": "above",
-        "multi_signals": signals,
-    }
-
-    send_discord_alert(alert_event)
-    print("[ECHO V] 🚀 Echo alert sent to Discord.")
-
 
 if __name__ == "__main__":
     while True:
-        print("[LOOP] 🌀 Starting Echo Sniper Loop...")
         run_echo_bybit_sniper()
-        print("[LOOP] ⏳ Sleeping 60 seconds...\n")
+        print("[LOOP] 🕒 Sleeping 60 seconds...\n")
         time.sleep(60)
