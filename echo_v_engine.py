@@ -1,14 +1,15 @@
-# echo_v_engine.py (Multi-Timeframe + Divergence + Echo Grid)
+# echo_v_engine.py (Upgraded with Echo Grid and Divergence Detection)
 
 import pandas as pd
 import numpy as np
 
 def calculate_rsi(series, period=14):
     delta = series.diff()
-    gain = delta.where(delta > 0, 0).rolling(window=period).mean()
-    loss = -delta.where(delta < 0, 0).rolling(window=period).mean()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
     rs = gain / loss
-    return 100 - (100 / (1 + rs))
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
 
 def detect_echo_signals(df: pd.DataFrame, tf_label: str):
     if df is None or df.empty or len(df) < 20:
@@ -18,64 +19,53 @@ def detect_echo_signals(df: pd.DataFrame, tf_label: str):
     df = df.copy()
     df["close"] = pd.to_numeric(df["close"], errors="coerce")
     df["rsi"] = calculate_rsi(df["close"])
-    
+
     latest = df.iloc[-1]
     prev = df.iloc[-2]
 
-    # Echo Sync-Up Signal
-    echo_signal = None
+    signal = None
+
+    # Echo Sync-Up: RSI crosses 50 and rising
     if prev["rsi"] < 50 and latest["rsi"] > 50 and latest["rsi"] > prev["rsi"]:
-        echo_signal = {
+        signal = {
             "timeframe": tf_label,
             "type": "Echo Sync Up",
-            "rsi": round(latest["rsi"], 2),
-            "price": float(latest["close"]),
-            "rsi_status": "Echo Sync Up"
+            "rsi_status": "Above 50 Rising",
+            "rsi": round(latest["rsi"], 2)
         }
         print(f"[ECHO V] ✅ Echo Sync Up detected on {tf_label}")
 
-    # Hidden Bearish Divergence: price high, RSI lower
-    price_highs = df["close"].rolling(10).max()
-    rsi_highs = df["rsi"].rolling(10).max()
-    
-    if (
-        df["close"].iloc[-1] >= price_highs.iloc[-2] and
-        df["rsi"].iloc[-1] < df["rsi"].iloc[-2] and
-        df["rsi"].iloc[-1] < rsi_highs.iloc[-2]
-    ):
-        echo_signal = {
+    # Hidden Bearish Divergence
+    elif df["close"].iloc[-1] > df["close"].iloc[-4] and df["rsi"].iloc[-1] < df["rsi"].iloc[-4]:
+        signal = {
             "timeframe": tf_label,
-            "type": "Hidden Bearish Div",
-            "rsi": round(latest["rsi"], 2),
-            "price": float(latest["close"]),
-            "rsi_status": "Hidden Bear Div"
+            "type": "Hidden Bear Div",
+            "rsi_status": "Lower RSI on Higher High",
+            "rsi": round(latest["rsi"], 2)
         }
-        print(f"[ECHO V] 🟥 Hidden Bearish Divergence on {tf_label}")
+        print(f"[ECHO V] 🟠 Hidden Bearish Div on {tf_label}")
 
-    # Hidden Bullish Divergence: price low, RSI higher
-    price_lows = df["close"].rolling(10).min()
-    rsi_lows = df["rsi"].rolling(10).min()
-
-    if (
-        df["close"].iloc[-1] <= price_lows.iloc[-2] and
-        df["rsi"].iloc[-1] > df["rsi"].iloc[-2] and
-        df["rsi"].iloc[-1] > rsi_lows.iloc[-2]
-    ):
-        echo_signal = {
+    # Hidden Bullish Divergence
+    elif df["close"].iloc[-1] < df["close"].iloc[-4] and df["rsi"].iloc[-1] > df["rsi"].iloc[-4]:
+        signal = {
             "timeframe": tf_label,
-            "type": "Hidden Bullish Div",
-            "rsi": round(latest["rsi"], 2),
-            "price": float(latest["close"]),
-            "rsi_status": "Hidden Bull Div"
+            "type": "Hidden Bull Div",
+            "rsi_status": "Higher RSI on Lower Low",
+            "rsi": round(latest["rsi"], 2)
         }
-        print(f"[ECHO V] 🟩 Hidden Bullish Divergence on {tf_label}")
+        print(f"[ECHO V] 🟢 Hidden Bullish Div on {tf_label}")
 
-    return echo_signal
+    return signal
 
-def build_echo_grid(rsi_value: float) -> str:
-    if rsi_value > 60:
-        return "⬆️ Rising"
-    elif rsi_value < 40:
-        return "⬇️ Falling"
-    else:
-        return "➖ Neutral"
+def build_echo_grid(results: list):
+    if not results:
+        return "None"
+
+    summary = "\n🧭 **Multi-Timeframe Echo V**\n"
+    for r in results:
+        tf = r.get("timeframe", "N/A")
+        typ = r.get("type", "-")
+        rsi = r.get("rsi", "?")
+        emoji = "🟢" if "Bull" in typ or "Sync" in typ else "🔴"
+        summary += f"{emoji} `{tf}` → {typ} (RSI: {rsi})\n"
+    return summary.strip()
