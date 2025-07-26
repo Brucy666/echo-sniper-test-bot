@@ -15,4 +15,4 @@ def format_tf_overview(tf_map):
 
     for tf, signal in tf_map.items():
         if signal == "None":
-            lines.append(f"`{tf:<4}`
+            lines.append(f"{tf:<4} ❌ No signal")
