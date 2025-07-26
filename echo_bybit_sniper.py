@@ -6,36 +6,40 @@ import time
 
 
 def run_echo_bybit_sniper():
-    print("[BYBIT SNIPER] 🧠 Echo Bybit Sniper Activated")
+    print("[BYBIT SNIPER] ✅ Echo Bybit Sniper Activated")
 
-    # Example: fetch data from Bybit (symbol and timeframe are hardcoded for testing)
-    try:
-        df = get_bybit_ohlcv("BTC/USDT", "1h")
-        if df is not None and not df.empty:
-            print("[BYBIT SNIPER] ✅ Fetched 1H OHLCV data from Bybit")
+    # Retrieve OHLCV data
+    df = get_bybit_ohlcv(symbol="BTCUSDT", interval="60")  # 60 = 1 hour candles
 
-            # Simulated test logic for now:
-            event = {
-                "symbol": "BTC/USDT",
-                "exchange": "Bybit",
-                "entry_price": df.iloc[-1]["close"],
-                "rsi": 34.2,
-                "spoof_ratio": 0.12,
-                "trap_type": "RSI-V",
-                "rsi_status": "V-Split",
-                "vsplit_score": "1H: V-Wave",
-                "confidence": 8.5,
-                "bias": "above"
-            }
-            send_discord_alert(event)
-        else:
-            print("[BYBIT SNIPER] ⚠️ No data returned from Bybit feed")
+    if df is None or df.empty:
+        print("[BYBIT SNIPER] ⚠️ No data returned from Bybit feed")
+        return
 
-    except Exception as e:
-        print(f"[BYBIT SNIPER ERROR] {e}")
+    # --- Echo analysis logic goes here ---
+    # For now, we'll simulate a signal trigger for testing
+    latest_candle = df.iloc[-1]
+    price = latest_candle["close"]
+
+    # Simulated signal
+    signal_event = {
+        "symbol": "BTCUSDT",
+        "exchange": "Bybit",
+        "entry_price": price,
+        "rsi": 54.2,
+        "spoof_ratio": 0.18,
+        "confidence": 7.5,
+        "trap_type": "RSI Split",
+        "rsi_status": "Echo Sync Up",
+        "vsplit_score": "Above AVWAP",
+        "bias": "above"
+    }
+
+    send_discord_alert(signal_event)
+    print("[BYBIT SNIPER] 🚀 Echo alert sent")
 
 
 if __name__ == "__main__":
     while True:
         run_echo_bybit_sniper()
+        print("[LOOP] ⏳ Sleeping 60 seconds...\n")
         time.sleep(60)
