@@ -1,4 +1,4 @@
-# echo_discord_alert.py — Final version with multi-timeframe map display
+# echo_discord_alert.py — Final Echo V Discord Alert with Timeframe Mapping
 
 import requests
 from datetime import datetime
@@ -6,23 +6,24 @@ import os
 
 DISCORD_WEBHOOK = os.getenv("DISCORD_ECHO_WEBHOOK")
 
-def format_tf_map(tf_signals):
-    lines = ["\n🧠 **Echo V Timeframe Map**"]
-    for tf, signal in tf_signals:
-        if "No Data" in signal:
-            lines.append(f"{tf:<5} ❌ No Data")
-        elif "No Signal" in signal:
-            lines.append(f"{tf:<5} ⛔️ No Signal")
-        elif "Hidden Bear" in signal:
-            lines.append(f"{tf:<5} 🟠 {signal}")
+def format_tf_overview(tf_map):
+    if not tf_map:
+        return "Unavailable"
+
+    lines = []
+    for tf, signal in tf_map.items():
+        if "Hidden Bear" in signal:
+            lines.append(f"{tf:<4} 🟠 {signal}")
         elif "Hidden Bull" in signal:
-            lines.append(f"{tf:<5} 🔵 {signal}")
-        elif "Sync Up" in signal:
-            lines.append(f"{tf:<5} ✅ {signal}")
-        elif "Sync Down" in signal:
-            lines.append(f"{tf:<5} 🔻 {signal}")
+            lines.append(f"{tf:<4} 🟢 {signal}")
+        elif "Sync" in signal:
+            lines.append(f"{tf:<4} ✅ {signal}")
+        elif "Signal" in signal:
+            lines.append(f"{tf:<4} 🔍 {signal}")
+        elif "No Data" in signal:
+            lines.append(f"{tf:<4} ⚠️  {signal}")
         else:
-            lines.append(f"{tf:<5} 🔍 {signal}")
+            lines.append(f"{tf:<4} ❌ No Signal")
     return "\n".join(lines)
 
 def format_discord_alert(event: dict) -> dict:
@@ -36,13 +37,14 @@ def format_discord_alert(event: dict) -> dict:
     status = event.get("rsi_status", "None")
     tf_score = event.get("vsplit_score", "None")
     bias = event.get("bias", "Unknown")
-    tf_map = event.get("multi_tf_map", [])
+    trigger_tf = event.get("trigger_tf", "N/A")
+    tf_map = event.get("tf_map", {}) or event.get("multi_tf_map", {})
     timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
 
     bias_emoji = "📈" if bias.lower() == "above" else "📉"
     spoof_emoji = "🟢" if spoof < 0.3 else "🟠" if spoof < 0.6 else "🔴"
     brain = "🧠" if confidence > 7 else "⚠️" if confidence > 4 else "❓"
-    tf_text = format_tf_map(tf_map)
+    tf_text = format_tf_overview({k: v for k, v in tf_map})
 
     return {
         "username": "Echo Sniper Bot",
@@ -61,7 +63,7 @@ def format_discord_alert(event: dict) -> dict:
                     {"name": "VWAP Zone", "value": f"`{tf_score}`", "inline": True},
                     {"name": "Confidence", "value": f"{brain} `{confidence}/10`", "inline": True},
                     {"name": "Time", "value": f"`{timestamp}`", "inline": False},
-                    {"name": "Timeframe Overview", "value": tf_text, "inline": False}
+                    {"name": "Timeframe Overview", "value": tf_text or "Unavailable", "inline": False}
                 ],
                 "footer": {"text": "Echo V Multi-Timeframe AI Engine"}
             }
@@ -81,6 +83,6 @@ def send_discord_alert(event: dict):
         if res.status_code in [200, 204]:
             print("[✓] Echo alert sent to Discord.")
         else:
-            print(f"[!] Discord alert failed: {res.status_code} - {res.text}")
+            print(f"[!] Discord alert failed: {res.status_code}, {res.text}")
     except Exception as e:
         print(f"[!] Discord send error: {e}")
