@@ -1,4 +1,4 @@
-# echo_discord_alert.py — Final Echo V Discord Alert with Timeframe Mapping
+# echo_discord_alert.py
 
 import requests
 from datetime import datetime
@@ -6,64 +6,43 @@ import os
 
 DISCORD_WEBHOOK = os.getenv("DISCORD_ECHO_WEBHOOK")
 
-def format_tf_overview(tf_map):
-    if not tf_map:
-        return "Unavailable"
-
-    lines = []
+def format_tf_map(tf_map: dict) -> str:
+    lines = ["**Timeframe Overview**"]
     for tf, signal in tf_map.items():
-        if "Hidden Bear" in signal:
-            lines.append(f"{tf:<4} 🟠 {signal}")
-        elif "Hidden Bull" in signal:
-            lines.append(f"{tf:<4} 🟢 {signal}")
+        if "Hidden Bull" in signal:
+            icon = "🟢"
+        elif "Hidden Bear" in signal:
+            icon = "🟠"
         elif "Sync" in signal:
-            lines.append(f"{tf:<4} ✅ {signal}")
-        elif "Signal" in signal:
-            lines.append(f"{tf:<4} 🔍 {signal}")
-        elif "No Data" in signal:
-            lines.append(f"{tf:<4} ⚠️  {signal}")
+            icon = "✅"
+        elif "No Signal" in signal:
+            icon = "🔍"
         else:
-            lines.append(f"{tf:<4} ❌ No Signal")
+            icon = "❓"
+        lines.append(f"{tf:<4} {icon} {signal}")
     return "\n".join(lines)
 
 def format_discord_alert(event: dict) -> dict:
-    symbol = event.get("symbol", "N/A")
-    exchange = event.get("exchange", "Unknown")
-    price = event.get("entry_price", 0)
-    rsi = event.get("rsi", "N/A")
-    spoof = event.get("spoof_ratio", 0)
-    confidence = event.get("confidence", 0)
-    trap_type = event.get("trap_type", "N/A")
-    status = event.get("rsi_status", "None")
-    tf_score = event.get("vsplit_score", "None")
-    bias = event.get("bias", "Unknown")
-    trigger_tf = event.get("trigger_tf", "N/A")
-    tf_map = event.get("tf_map", {}) or event.get("multi_tf_map", {})
     timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
-
-    bias_emoji = "📈" if bias.lower() == "above" else "📉"
-    spoof_emoji = "🟢" if spoof < 0.3 else "🟠" if spoof < 0.6 else "🔴"
-    brain = "🧠" if confidence > 7 else "⚠️" if confidence > 4 else "❓"
-    tf_text = format_tf_overview({k: v for k, v in tf_map})
 
     return {
         "username": "Echo Sniper Bot",
         "embeds": [
             {
-                "title": f"🎯 Echo Signal Detected",
-                "color": 0x00ffae if bias.lower() == "above" else 0xff5555,
+                "title": "🎯 Echo Signal Detected",
+                "color": 0x00ffae,
                 "fields": [
-                    {"name": "Symbol", "value": f"`{symbol}`", "inline": True},
-                    {"name": "Exchange", "value": f"`{exchange}`", "inline": True},
-                    {"name": "Bias", "value": f"{bias_emoji} `{bias}`", "inline": True},
-                    {"name": "Signal", "value": f"`{status}`", "inline": True},
-                    {"name": "Trap Type", "value": f"`{trap_type}`", "inline": True},
-                    {"name": "Spoof Ratio", "value": f"{spoof_emoji} `{spoof:.2f}`", "inline": True},
-                    {"name": "Entry Price", "value": f"`{price}`", "inline": True},
-                    {"name": "VWAP Zone", "value": f"`{tf_score}`", "inline": True},
-                    {"name": "Confidence", "value": f"{brain} `{confidence}/10`", "inline": True},
-                    {"name": "Time", "value": f"`{timestamp}`", "inline": False},
-                    {"name": "Timeframe Overview", "value": tf_text or "Unavailable", "inline": False}
+                    {"name": "Symbol", "value": event.get("symbol", "N/A"), "inline": True},
+                    {"name": "Exchange", "value": event.get("exchange", "N/A"), "inline": True},
+                    {"name": "Bias", "value": f"📈 {event.get('bias', '')}", "inline": True},
+                    {"name": "Signal", "value": event.get("rsi_status", "None"), "inline": True},
+                    {"name": "Trap Type", "value": event.get("trap_type", "N/A"), "inline": True},
+                    {"name": "Spoof Ratio", "value": f"🟢 {event.get('spoof_ratio', 0):.2f}", "inline": True},
+                    {"name": "Entry Price", "value": str(event.get("entry_price", 0)), "inline": True},
+                    {"name": "VWAP Zone", "value": event.get("vsplit_score", "N/A"), "inline": True},
+                    {"name": "Confidence", "value": f"🧠 {event.get('confidence', 0)}/10", "inline": True},
+                    {"name": "Time", "value": timestamp, "inline": False},
+                    {"name": "Timeframe Overview", "value": format_tf_map(event.get("tf_map", {})), "inline": False}
                 ],
                 "footer": {"text": "Echo V Multi-Timeframe AI Engine"}
             }
@@ -72,17 +51,17 @@ def format_discord_alert(event: dict) -> dict:
 
 def send_discord_alert(event: dict):
     if not DISCORD_WEBHOOK:
-        print("[❌] No Discord webhook set.")
+        print("[❌] Missing webhook.")
         return
 
-    payload = format_discord_alert(event)
-    headers = {"Content-Type": "application/json"}
-
     try:
-        res = requests.post(DISCORD_WEBHOOK, json=payload, headers=headers)
-        if res.status_code in [200, 204]:
-            print("[✓] Echo alert sent to Discord.")
+        payload = format_discord_alert(event)
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(DISCORD_WEBHOOK, json=payload, headers=headers)
+
+        if response.status_code in [200, 204]:
+            print("[✓] Discord alert sent.")
         else:
-            print(f"[!] Discord alert failed: {res.status_code}, {res.text}")
+            print(f"[!] Discord error: {response.status_code} {response.text}")
     except Exception as e:
-        print(f"[!] Discord send error: {e}")
+        print(f"[!] Alert send failed: {e}")
