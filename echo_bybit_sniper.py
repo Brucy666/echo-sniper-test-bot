@@ -57,4 +57,4 @@ def run_echo_bybit_sniper():
         }
 
         send_discord_alert(signal_event)
-        print("[ECHO V] 
+        print("[ECHO V]")
