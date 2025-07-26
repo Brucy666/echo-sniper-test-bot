@@ -33,7 +33,8 @@ def detect_echo_signals(df: pd.DataFrame, tf_label: str):
         signal = {
             "timeframe": tf_label,
             "type": "Echo Sync Up",
-            "rsi": round(latest["rsi"], 2)
+            "rsi": round(latest["rsi"], 2),
+            "rsi_status": "Echo Sync Up"
         }
         print(f"[ECHO V] ✅ Echo Sync Up detected on {tf_label}")
 
