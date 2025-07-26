@@ -1,6 +1,6 @@
 # rsi_sniper_engine/rsi_loop.py (Standalone AI RSI Sniper)
 
-from rsi_logic import scan_rsi_sniper_map
+from rsi_sniper_engine.rsi_logic import scan_rsi_sniper_map
 from rsi_discord_alert import send_rsi_discord_alert
 import time
 
