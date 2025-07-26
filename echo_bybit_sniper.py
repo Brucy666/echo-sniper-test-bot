@@ -2,7 +2,7 @@
 
 from bybit_feed import get_bybit_ohlcv
 from echo_v_engine import detect_echo_signals
-from echo_discord_alert import send_discord_alert
+from discord_alert import send_discord_alert
 import time
 
 def run_echo_bybit_sniper():
